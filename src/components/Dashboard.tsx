@@ -1,85 +1,56 @@
-import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TaskCard } from './TaskCard';
 import { RefreshCw, Users, CheckCircle, Clock, Zap } from 'lucide-react';
 import heroImage from '@/assets/hackbuddy-hero.jpg';
+import { useTasks } from '@/hooks/useTasks';
+import { formatDistanceToNow } from 'date-fns';
 
-interface Task {
-  id: string;
-  user: string;
-  task: string;
-  status: 'pending' | 'done';
-  timestamp: string;
-  isNew?: boolean;
-}
-
-// Mock data for demo - in real app this would come from Supabase
-const mockTasks: Task[] = [
-  {
-    id: '1',
-    user: 'CodeNinja42',
-    task: 'Implement user authentication system with JWT',
-    status: 'pending',
-    timestamp: '2 hours ago',
-    isNew: true
-  },
-  {
-    id: '2',
-    user: 'ReactMaster',
-    task: 'Create responsive dashboard layout',
-    status: 'done',
-    timestamp: '4 hours ago'
-  },
-  {
-    id: '3',
-    user: 'APIWizard',
-    task: 'Set up database migrations and seed data',
-    status: 'pending',
-    timestamp: '6 hours ago'
-  },
-  {
-    id: '4',
-    user: 'DevOpsGuru',
-    task: 'Configure CI/CD pipeline with automated testing',
-    status: 'done',
-    timestamp: '1 day ago'
-  },
-  {
-    id: '5',
-    user: 'FullStackDev',
-    task: 'Optimize API endpoints for better performance',
-    status: 'pending',
-    timestamp: '1 day ago',
-    isNew: true
-  }
-];
+// Remove the Task interface and mock data - now handled by Supabase
 
 export const Dashboard = () => {
-  const [tasks, setTasks] = useState<Task[]>(mockTasks);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const { tasks, loading, error, updateTaskStatus, fetchTasks } = useTasks();
   
-  const handleMarkDone = (taskId: string) => {
-    setTasks(prev => 
-      prev.map(task => 
-        task.id === taskId 
-          ? { ...task, status: 'done' as const, isNew: false }
-          : task
-      )
-    );
+  const handleMarkDone = (taskId: string, currentStatus: 'pending' | 'done') => {
+    const newStatus = currentStatus === 'pending' ? 'done' : 'pending';
+    updateTaskStatus(taskId, newStatus);
   };
 
   const handleRefresh = async () => {
-    setIsRefreshing(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setIsRefreshing(false);
+    await fetchTasks();
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-hero flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading tasks...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-hero flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-destructive mb-4">Error: {error}</p>
+          <Button onClick={handleRefresh} variant="outline">
+            Try Again
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   const pendingTasks = tasks.filter(task => task.status === 'pending');
   const completedTasks = tasks.filter(task => task.status === 'done');
-  const newTasks = tasks.filter(task => task.isNew);
+  const newTasks = tasks.filter(task => {
+    const createdAt = new Date(task.created_at);
+    return Date.now() - createdAt.getTime() < 5 * 60 * 1000; // 5 minutes
+  });
 
   return (
     <div className="min-h-screen bg-gradient-hero">
@@ -102,11 +73,10 @@ export const Dashboard = () => {
             </div>
             <Button 
               onClick={handleRefresh}
-              disabled={isRefreshing}
               variant="outline"
               className="border-primary/50 hover:bg-primary/10"
             >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
             </Button>
           </div>
@@ -201,13 +171,22 @@ export const Dashboard = () => {
               </Badge>
             </div>
             <div className="space-y-4">
-              {pendingTasks.map(task => (
-                <TaskCard 
-                  key={task.id} 
-                  task={task} 
-                  onMarkDone={handleMarkDone}
-                />
-              ))}
+              {pendingTasks.map(task => {
+                const timestamp = formatDistanceToNow(new Date(task.created_at), { addSuffix: true });
+                const isNew = Date.now() - new Date(task.created_at).getTime() < 5 * 60 * 1000;
+                
+                return (
+                  <TaskCard 
+                    key={task.id} 
+                    task={{
+                      ...task,
+                      timestamp,
+                      isNew
+                    }} 
+                    onMarkDone={handleMarkDone}
+                  />
+                );
+              })}
               {pendingTasks.length === 0 && (
                 <Card className="bg-gradient-card border-border/50 shadow-card">
                   <CardContent className="pt-6 text-center">
@@ -231,9 +210,19 @@ export const Dashboard = () => {
               </Badge>
             </div>
             <div className="space-y-4">
-              {completedTasks.map(task => (
-                <TaskCard key={task.id} task={task} />
-              ))}
+              {completedTasks.map(task => {
+                const timestamp = formatDistanceToNow(new Date(task.created_at), { addSuffix: true });
+                
+                return (
+                  <TaskCard 
+                    key={task.id} 
+                    task={{
+                      ...task,
+                      timestamp
+                    }} 
+                  />
+                );
+              })}
             </div>
           </div>
         </div>

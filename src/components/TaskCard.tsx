@@ -4,18 +4,18 @@ import { Button } from "@/components/ui/button";
 import { User, Clock, CheckCircle2, Circle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface Task {
-  id: string;
-  user: string;
-  task: string;
-  status: 'pending' | 'done';
-  timestamp: string;
-  isNew?: boolean;
-}
+// Remove the Task interface as it's now in Supabase types
 
 interface TaskCardProps {
-  task: Task;
-  onMarkDone?: (taskId: string) => void;
+  task: {
+    id: string;
+    user: string;
+    task: string;
+    status: 'pending' | 'done';
+    timestamp: string;
+    isNew?: boolean;
+  };
+  onMarkDone?: (taskId: string, currentStatus: 'pending' | 'done') => void;
 }
 
 export const TaskCard = ({ task, onMarkDone }: TaskCardProps) => {
@@ -63,7 +63,7 @@ export const TaskCard = ({ task, onMarkDone }: TaskCardProps) => {
         </p>
         {task.status === 'pending' && onMarkDone && (
           <Button 
-            onClick={() => onMarkDone(task.id)}
+            onClick={() => onMarkDone(task.id, task.status)}
             variant="default"
             size="sm"
             className="bg-gradient-primary hover:shadow-glow transition-all duration-300"
